@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+<string name="app_name">Badged</string>
+
+    <!-- Onboarding Strings -->
+    <string name="onboarding_next">Next</string>
+     <string name="onboarding_skip">Skip</string>
+     <string name="onboarding_get_started">Get Started</string>
+     <string name="onboarding_image_description">Onboarding illustration</string>
+
+    <!-- Onboarding Page 1 -->
+     <string name="onboarding_title_collect">Collect Digital Badges</string>
+     <string name="onboarding_desc_collect">Earn and collect unique digital badges on your visits.</string>
+
+
+    <!-- Onboarding Page 2 -->
+    <string name="onboarding_title_scan">Scan QR Codes</string>
+    <string name="onboarding_desc_scan">Simply scan QR codes at participating locations to collect badges.</string>
+
+    <!-- Onboarding Page 3 -->
+    <string name="onboarding_title_wallet">Your Digital Wallet</string>
+    <string name="onboarding_desc_wallet">We\'ll create a secure digital wallet to store your badges as NFTs.</string>
+
+    <!-- QR Scanner strings -->
+    <string name="scan_qr_code">Scan QR Code</string>
+    <string name="gallery">Gallery</string>
+    <string name="scanner_ready">Point camera at a badge QR code</string>
+    <string name="scanner_no_wallet">Wallet will be created when you scan your first badge</string>
+    <string name="camera_permission_required">Camera permission is required for scanning QR codes</string>
+    <string name="invalid_qr_code">Not a valid badge QR code</string>
+    <string name="error_parsing_qr">Error parsing QR code</string>
+    <string name="processing">Processing...</string>
+    <string name="create_wallet_title">Create Digital Wallet</string>
+    <string name="create_wallet_message">To collect this badge, we need to create a secure digital wallet for you.</string>
+    <string name="create_wallet_confirm">Create Wallet</string>
+    <string name="cancel">Cancel</string>
+    <string name="wallet_creation_error">Error creating wallet: %1$s</string>
+    <string name="badge_mint_error">Error minting badge: %1$s</string>
+</resources>

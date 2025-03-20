@@ -36,4 +36,14 @@
     <string name="cancel">Cancel</string>
     <string name="wallet_creation_error">Error creating wallet: %1$s</string>
     <string name="badge_mint_error">Error minting badge: %1$s</string>
+
+    <!-- Badge Gallery Strings -->
+    <string name="badge_gallery_title">My Badges</string>
+    <string name="empty_badges_description">Empty badges icon</string>
+    <string name="no_badges_title">No Badges Yet</string>
+    <string name="no_badges_message">Scan QR codes at participating locations to collect digital badges.</string>
+    <string name="scan_badge">Scan Badge</string>
+    <string name="badge_image_description">Badge image</string>
+    <string name="acquired_date">Acquired: %1$s</string>
+    <string name="badge_detail_title">Badge Details</string>
 </resources>

@@ -1,6 +1,10 @@
 package org.defalsified.android.badged.models;
 
-//badge data model
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
+
+
 public class Badge {
     private String id;
     private String name;
@@ -9,6 +13,7 @@ public class Badge {
     private long timestamp;
 
     public Badge() {
+        this.timestamp = System.currentTimeMillis();
     }
 
     public Badge(String id, String name, String description, String imageUrl) {
@@ -58,5 +63,14 @@ public class Badge {
 
     public void setTimestamp(long timestamp) {
         this.timestamp = timestamp;
+    }
+
+    /**
+     * formatted date string for the badge acquisition date
+
+     */
+    public String getFormattedDate() {
+        SimpleDateFormat dateFormat = new SimpleDateFormat("MMMM d, yyyy", Locale.getDefault());
+        return dateFormat.format(new Date(timestamp));
     }
 }

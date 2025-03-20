@@ -26,6 +26,7 @@ import org.defalsified.android.badged.services.BadgeService;
 import org.defalsified.android.badged.services.WalletManager;
 import org.defalsified.android.badged.ui.badges.BadgeDetailActivity;
 import org.defalsified.android.badged.utils.QrCodeParser;
+import org.defalsified.android.badged.ui.badges.BadgeGalleryActivity;
 import com.google.common.util.concurrent.ListenableFuture;
 
 import org.json.JSONException;
@@ -255,7 +256,7 @@ public class QrScannerActivity extends AppCompatActivity {
 
     /**
      * Create a wallet and then mint the nft( we'll display the badge)
-     *
+     * we can mint the nft,store it in wala and access it from wala
      * @param qrData The QR data for the badge
      */
     private void createWalletAndMintBadge(JSONObject qrData) {
@@ -343,12 +344,13 @@ public class QrScannerActivity extends AppCompatActivity {
         startActivity(intent);
     }
 
+
     /**
      * Open the badge gallery
      */
     private void openBadgeGallery() {
-        // For now, just show a toast
-        Toast.makeText(this, "Badge Gallery coming soon!", Toast.LENGTH_SHORT).show();
+        Intent intent = new Intent(this, BadgeGalleryActivity.class);
+        startActivity(intent);
     }
 
     @Override

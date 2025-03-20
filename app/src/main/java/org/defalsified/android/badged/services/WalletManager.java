@@ -10,7 +10,7 @@ import java.util.UUID;
 
 /**
  * Temporary wallet manager
- *TO  replaced with the native C implementation
+ *To be  replaced with the native C implementation
  */
 
 public class WalletManager {

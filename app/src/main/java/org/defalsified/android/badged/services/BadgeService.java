@@ -10,43 +10,60 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- *  a placeholder Service for badge operations
+ * Service for badge operations
+ * TO be replaced with the C implementation
  */
 public class BadgeService {
     private final Context context;
+    private final BadgeRepository badgeRepository;
 
     public BadgeService(Context context) {
         this.context = context;
+        this.badgeRepository = new BadgeRepository(context);
     }
 
     /**
-     * Mint a new badge from QR data (nft for the proof of stay at the apartments/the cafe)
+     * Mint a new badge from QR data
      *
      * @param qrData QR code data
      * @param walletAddress User's wallet address
      * @param callback Callback for mint operation
      */
     public void mintBadge(JSONObject qrData, String walletAddress, BadgeCallback callback) {
-        // A placeholder implementation
-        //  this will call the blockchain APIs
+        // This is a placeholder implementation
 
+        // Simulate network delay
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             try {
                 // Extract badge info from QR code
                 String badgeId = qrData.getString("badge_id");
                 String merchantId = qrData.getString("merchant_id");
 
-                // Create a badge (the nft metadata to come from wala or the source we will use, not on chain prolly)
+                // Check if badge already exists
+                Badge existingBadge = badgeRepository.getBadgeById(badgeId);
+                if (existingBadge != null) {
+                    // Badge already exists
+                    callback.onSuccess(existingBadge);
+                    return;
+                }
+
+                // Create a badge (to be be minted and stored off chain)
                 Badge badge = new Badge();
                 badge.setId(badgeId);
                 badge.setName("Sample Badge #" + (badgeId.length() >= 4 ? badgeId.substring(0, 4) : badgeId));
-
                 badge.setDescription("A badge from merchant " + merchantId);
-                badge.setImageUrl("https://org.defalsified.badged" + badgeId + ".png");
+                badge.setImageUrl("https://example.com/badge/" + badgeId + ".png");
                 badge.setTimestamp(System.currentTimeMillis());
 
-                // Return success
-                callback.onSuccess(badge);
+                // Save badge to repository
+                boolean saved = badgeRepository.saveBadge(badge);
+
+                if (saved) {
+                    // Return success
+                    callback.onSuccess(badge);
+                } else {
+                    callback.onError("Failed to save badge");
+                }
 
             } catch (JSONException e) {
                 callback.onError("Invalid badge data: " + e.getMessage());

@@ -35,3 +35,11 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         # List libraries link to the target library
         android
         log)
+        
+add_library(
+        qaeda
+
+        SHARED
+
+        src/main/jni/org_defalsified_android_LibQaeda.c
+)

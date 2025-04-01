@@ -4,7 +4,6 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Locale;
 
-
 public class Badge {
     private String id;
     private String name;
@@ -67,8 +66,8 @@ public class Badge {
 
     /**
      * formatted date string for the badge acquisition date
-
      */
+
     public String getFormattedDate() {
         SimpleDateFormat dateFormat = new SimpleDateFormat("MMMM d, yyyy", Locale.getDefault());
         return dateFormat.format(new Date(timestamp));

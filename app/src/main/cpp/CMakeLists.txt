@@ -35,11 +35,21 @@ target_link_libraries(${CMAKE_PROJECT_NAME}
         # List libraries link to the target library
         android
         log)
-        
+
 add_library(
         qaeda
-
         SHARED
+        org_defalsified_android_badged_services_LibQaeda.c
+        libqaeda/src/store/dummy.c
+        libqaeda/src/hex.c
+)
 
-        src/main/jni/org_defalsified_android_LibQaeda.c
+# directories for libqaeda
+target_include_directories(qaeda PRIVATE
+        libqaeda/src
+)
+
+target_link_libraries(qaeda
+        android
+        log
 )

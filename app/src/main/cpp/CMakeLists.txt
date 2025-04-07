@@ -1,13 +1,49 @@
-cmake_minimum_required(VERSION 3.22.1)
-project(badged)
-set(LIBQAEDA_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libqaeda/src)
+cmake_minimum_required(VERSION 3.10)
+project(badged_app)
+
 set(LIBQAEDA_DIR ${CMAKE_CURRENT_SOURCE_DIR}/libqaeda)
-include_directories(${LIBQAEDA_DIR}/src ${CMAKE_CURRENT_SOURCE_DIR})
-file(GLOB_RECURSE LIBQAEDA_SOURCES ${LIBQAEDA_DIR}/src/*.c)
-add_library(qaeda SHARED
-        ${CMAKE_CURRENT_SOURCE_DIR}/org_defalsified_android_badged_services_LibQaeda.c
-        ${LIBQAEDA_SOURCES}
+set(LIBQAEDA_SRC_DIR ${LIBQAEDA_DIR}/src)
+
+include_directories(
+        ${CMAKE_CURRENT_SOURCE_DIR}
+        ${LIBQAEDA_SRC_DIR}
+        ${LIBQAEDA_SRC_DIR}/aux/include
+        ${LIBQAEDA_SRC_DIR}/aux/liblash/src
+        ${LIBQAEDA_SRC_DIR}/aux/liblash/src/hex
+        ${LIBQAEDA_SRC_DIR}/aux/liblash/src/rerr
 )
-target_link_libraries(qaeda android log atomic m)
-add_library(badged SHARED native-lib.cpp)
-target_link_libraries(badged qaeda android log)
+
+add_library(qaeda SHARED
+        # JNI Interface
+        ${CMAKE_CURRENT_SOURCE_DIR}/org_defalsified_android_badged_services_LibQaeda.c
+
+        ${LIBQAEDA_SRC_DIR}/store/dummy.c
+
+        # Required hex functionality from liblash
+        ${LIBQAEDA_SRC_DIR}/aux/liblash/src/hex/hex.c
+        ${LIBQAEDA_SRC_DIR}/aux/liblash/src/rerr/rerr.c
+)
+
+target_compile_definitions(qaeda PRIVATE
+        ANDROID=1
+)
+
+# Linking against Android libraries
+target_link_libraries(qaeda
+        android
+        log
+        atomic
+        m
+)
+
+# Create main app library
+add_library(badged SHARED
+        native-lib.cpp
+)
+
+# Link app against our JNI wrapper
+target_link_libraries(badged
+        qaeda
+        android
+        log
+)

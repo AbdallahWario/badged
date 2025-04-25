@@ -13,35 +13,27 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         tools:targetApi="31">
-<!--        <activity-->
-<!--            android:name=".MainActivity"-->
-<!--            android:exported="true">-->
-<!--        </activity>-->
+
+        <!-- BadgeGalleryActivity as the launcher activity-->
         <activity
-            android:name=".MainActivity"
+            android:name=".ui.badges.BadgeGalleryActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-<!--        <activity-->
-<!--            android:name=".ui.onboarding.OnboardingActivity"-->
-<!--            android:exported="true">-->
-<!--            <intent-filter>-->
-<!--                <action android:name="android.intent.action.MAIN" />-->
-<!--                <category android:name="android.intent.category.LAUNCHER" />-->
-<!--            </intent-filter>-->
-<!--        </activity>-->
+
+        <!-- Keep MainActivity but not as launcher -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false">
+        </activity>
+
         <activity
             android:name=".ui.scanner.QrScannerActivity" />
 
         <activity
             android:name=".ui.badges.BadgeDetailActivity" />
-
-        <activity
-            android:name=".ui.badges.BadgeGalleryActivity" />
-
-
     </application>
 </manifest>

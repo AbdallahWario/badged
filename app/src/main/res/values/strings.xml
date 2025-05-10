@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-<string name="app_name">Badged</string>
+<string name="app_name">Vouchers</string>
 
     <!-- Onboarding Strings -->
     <string name="onboarding_next">Next</string>
@@ -9,36 +9,44 @@
      <string name="onboarding_image_description">Onboarding illustration</string>
 
     <!-- Onboarding Page 1 -->
-     <string name="onboarding_title_collect">Collect Digital Badges</string>
-     <string name="onboarding_desc_collect">Earn and collect unique digital badges on your visits.</string>
+     <string name="onboarding_title_collect">Collect vouchers</string>
+     <string name="onboarding_desc_collect">let customers redeem.</string>
 
 
     <!-- Onboarding Page 2 -->
     <string name="onboarding_title_scan">Scan QR Codes</string>
-    <string name="onboarding_desc_scan">Simply scan QR codes at participating locations to collect badges.</string>
+    <string name="onboarding_desc_scan">Simply scan QR codes .</string>
 
-    <!-- Onboarding Page 3 -->
-    <string name="onboarding_title_wallet">Your Digital Wallet</string>
-    <string name="onboarding_desc_wallet">We\'ll create a secure digital wallet to store your badges as NFTs.</string>
+
 
     <!-- QR Scanner strings -->
     <string name="scan_qr_code">Scan QR Code</string>
     <string name="gallery">Gallery</string>
     <string name="scanner_ready">Point camera at a badge QR code</string>
-    <string name="scanner_no_wallet">Wallet will be created when you scan your first badge</string>
     <string name="camera_permission_required">Camera permission is required for scanning QR codes</string>
-    <string name="invalid_qr_code">Not a valid badge QR code</string>
+    <string name="invalid_qr_code">Not a valid QR code</string>
     <string name="error_parsing_qr">Error parsing QR code</string>
     <string name="processing">Processing...</string>
-    <string name="create_wallet_title">Create Digital Wallet</string>
-    <string name="create_wallet_message">To collect this badge, we need to create a secure digital wallet for you.</string>
-    <string name="create_wallet_confirm">Create Wallet</string>
     <string name="cancel">Cancel</string>
-    <string name="wallet_creation_error">Error creating wallet: %1$s</string>
     <string name="badge_mint_error">Error minting badge: %1$s</string>
 
+    <!-- strings.xml -->
+    <string name="newly_redeemed">Newly Redeemed!</string>
+    <string name="badge_share_text">voucher redeemed: %1$s\nSerial: %2$s\nDate: %3$s</string>
+    <string name="share_badge">Share Badge</string>
+
+
+    <!-- Certificate verification strings -->
+    <string name="verification_in_progress">Verifying certificate...</string>
+    <string name="verification_success">Certificate verified</string>
+    <string name="verification_failed">Certificate verification failed</string>
+    <string name="verification_error">Certificate verification error</string>
+    <string name="no_certificate_data">No certificate data available</string>
+    <string name="certificate_invalid">Certificate is invalid</string>
+    <string name="certificate_verification_error">Error during certificate verification</string>
     <!-- Badge Gallery Strings -->
-    <string name="badge_gallery_title">My Badges</string>
+    <string name="badge_gallery_title">Vouchers</string>
+    <string name="scan_voucher">Scan a Voucher</string>
     <string name="empty_badges_description">Empty badges icon</string>
     <string name="no_badges_title">No vouchers Yet</string>
     <string name="no_badges_message">Scan QR codes at participating locations to collect digital vouchers.</string>

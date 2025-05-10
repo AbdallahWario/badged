@@ -1,31 +1,95 @@
 package org.defalsified.android.badged.services;
 
-public class Cert{
+/**
+ * Certificate handler for verifying digital vouchers using libqaeda
+ */
+public class Cert {
 
+    // Load native library
     static {
         System.loadLibrary("qaeda");
     }
 
     /**
-     * Deserialize a certificate from a byte array.
+     * Deserialize certificate and extract JSON content
      *
-     * @param data The serialized certificate data
-     * @return A handle to the deserialized certificate, or 0 if deserialization failed
+     * @param serializedData The serialized certificate bytes
+     * @return JSON string extracted from the certificate, or null if failed
      */
-    public native long deserializeCertificate(byte[] data);
+    public native String deserialize(byte[] serializedData);
 
     /**
-     * Verify a certificate's signatures.
+     * Verify the currently loaded certificate
      *
-     * @param certHandle The handle to the certificate to verify
-     * @return 0 on success, error code otherwise
+     * @return true if verification succeeds, false otherwise
      */
-    public native int verifyCertificate(long certHandle);
+    public native boolean verify();
 
     /**
-     * Free a certificate to prevent memory leaks.
-     *
-     * @param certHandle The handle to the certificate to free
+     * Free certificate resources
+     * Should be called when done with the certificate to prevent memory leaks
      */
-    public native void freeCertificate(long certHandle);
+    public native void destroy();
+
+    /**
+     * Helper method to deserialize and verify a certificate
+     *
+     * @param serializedData The serialized certificate bytes
+     * @return JSON string extracted from the certificate if valid, null otherwise
+     */
+    public String deserializeAndVerify(byte[] serializedData) {
+        String jsonContent = deserialize(serializedData);
+        if (jsonContent != null && verify()) {
+            return jsonContent;
+        }
+        // Clean up if verification failed
+        destroy();
+        return null;
+    }
+
+    /**
+     * Process a serialized certificate completely
+     * This method deserializes, verifies, and then cleans up the certificate
+     *
+     * @param serializedData The serialized certificate bytes
+     * @return CertificateResult containing the status and JSON if successful
+     */
+    public CertificateResult processAndCleanup(byte[] serializedData) {
+        CertificateResult result = new CertificateResult();
+
+        // Deserialize
+        String jsonContent = deserialize(serializedData);
+        if (jsonContent == null) {
+            result.success = false;
+            result.error = "Failed to deserialize certificate";
+            return result;
+        }
+
+        // Verify
+        boolean isValid = verify();
+        if (!isValid) {
+            result.success = false;
+            result.error = "Certificate verification failed";
+            destroy(); // Clean up on failure
+            return result;
+        }
+
+        // Success
+        result.success = true;
+        result.jsonContent = jsonContent;
+
+        // Clean up resources
+        destroy();
+
+        return result;
+    }
+
+    /**
+     * Result wrapper for certificate processing
+     */
+    public static class CertificateResult {
+        public boolean success;
+        public String jsonContent;
+        public String error;
+    }
 }

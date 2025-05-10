@@ -4,6 +4,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
@@ -42,12 +43,16 @@ public class BadgeGalleryActivity extends AppCompatActivity implements BadgeAdap
         emptyState = findViewById(R.id.empty_state);
         recyclerView = findViewById(R.id.badge_recycler_view);
         Button scanButton = findViewById(R.id.scan_badge_button);
+        TextView scanVoucherText = findViewById(R.id.scan_voucher_text);
 
         // Set up RecyclerView
         recyclerView.setLayoutManager(new GridLayoutManager(this, 2));
 
-        // Set up scan button
+        // Set up scan button in empty state
         scanButton.setOnClickListener(v -> openScanner());
+
+        // Set up scan voucher text in toolbar
+        scanVoucherText.setOnClickListener(v -> openScanner());
     }
 
     @Override
@@ -86,7 +91,7 @@ public class BadgeGalleryActivity extends AppCompatActivity implements BadgeAdap
     public void onBadgeClick(Badge badge) {
         // Open badge detail screen
         Intent intent = new Intent(this, BadgeDetailActivity.class);
-        intent.putExtra(BadgeDetailActivity.EXTRA_BADGE_ID, badge.getId());
+        intent.putExtra(BadgeDetailActivity.EXTRA_BADGE_SERIAL, badge.getSerial());
         startActivity(intent);
     }
 

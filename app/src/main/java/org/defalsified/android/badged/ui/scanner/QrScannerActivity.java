@@ -4,13 +4,14 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.util.Base64;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.camera.core.CameraSelector;
 import androidx.camera.core.ImageAnalysis;
@@ -20,14 +21,15 @@ import androidx.camera.view.PreviewView;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.google.common.util.concurrent.ListenableFuture;
+
 import org.defalsified.android.badged.R;
 import org.defalsified.android.badged.models.Badge;
 import org.defalsified.android.badged.services.BadgeService;
-import org.defalsified.android.badged.services.WalletManager;
+import org.defalsified.android.badged.services.Cert;
 import org.defalsified.android.badged.ui.badges.BadgeDetailActivity;
-import org.defalsified.android.badged.utils.QrCodeParser;
 import org.defalsified.android.badged.ui.badges.BadgeGalleryActivity;
-import com.google.common.util.concurrent.ListenableFuture;
+import org.defalsified.android.badged.utils.QrCodeParser;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -36,26 +38,25 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/**
- * Activity for scanning QR codes to collect badges.
- * This handles camera permission, QR code scanning, and wallet creation if needed.
- */
 public class QrScannerActivity extends AppCompatActivity {
+    private static final String TAG = "QrScannerActivity";
+    private static final int REQUEST_CAMERA_PERMISSION = 10;
 
     // UI Components
     private PreviewView previewView;
     private TextView statusTextView;
     private Button galleryButton;
+    private View loadingView;
 
-    // Camera and analysis components
+    // Camera and analysis
     private ExecutorService cameraExecutor;
 
-    // Service components
-    private WalletManager walletManager;
+    // Services
     private BadgeService badgeService;
+    private Cert certHandler;
 
-    // Permission request code
-    private static final int REQUEST_CAMERA_PERMISSION = 10;
+    // Processing state
+    private boolean isProcessing = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -63,16 +64,16 @@ public class QrScannerActivity extends AppCompatActivity {
         setContentView(R.layout.activity_qr_scanner);
 
         // Initialize services
-        walletManager = new WalletManager(this);
         badgeService = new BadgeService(this);
+        certHandler = new Cert();
 
-        // Initialize UI
-        initViews();
+        // Setup UI
+        initializeViews();
 
-        // Set up camera executor
+        // Setup camera executor
         cameraExecutor = Executors.newSingleThreadExecutor();
 
-        // Check and request camera permission
+        // Request camera permission if needed
         if (hasCameraPermission()) {
             startCamera();
         } else {
@@ -80,95 +81,70 @@ public class QrScannerActivity extends AppCompatActivity {
         }
     }
 
-    /**
-     * Initialize view references and click listeners
-     */
-    private void initViews() {
+    // Initialize UI components
+    private void initializeViews() {
         previewView = findViewById(R.id.preview_view);
         statusTextView = findViewById(R.id.status_text);
         galleryButton = findViewById(R.id.gallery_button);
+        loadingView = findViewById(R.id.loading_view);
 
-        // Set up gallery button click listener
         galleryButton.setOnClickListener(v -> openBadgeGallery());
-
-        // Update status text
         updateStatusText();
     }
 
-    /**
-     * Update the status text based on wallet status
-     */
+    // Update status message
     private void updateStatusText() {
-        if (walletManager.hasWallet()) {
-            statusTextView.setText(R.string.scanner_ready);
-        } else {
-            statusTextView.setText(R.string.scanner_no_wallet);
-        }
+        statusTextView.setText(R.string.scanner_ready);
     }
 
-    /**
-     * Check if we have camera permission
-     */
+    // Check camera permission
     private boolean hasCameraPermission() {
-        return ContextCompat.checkSelfPermission(
-                this,
-                Manifest.permission.CAMERA
-        ) == PackageManager.PERMISSION_GRANTED;
+        return ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED;
     }
 
-    /**
-     * Request camera permission
-     */
+    // Request camera permission
     private void requestCameraPermission() {
-        ActivityCompat.requestPermissions(
-                this,
+        ActivityCompat.requestPermissions(this,
                 new String[]{Manifest.permission.CAMERA},
-                REQUEST_CAMERA_PERMISSION
-        );
+                REQUEST_CAMERA_PERMISSION);
     }
 
-    /**
-     * Handle permission request result
-     */
+    // Handle permission result
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+                                           @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         if (requestCode == REQUEST_CAMERA_PERMISSION) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Permission granted, start camera
                 startCamera();
             } else {
-                // Permission denied
                 Toast.makeText(this, R.string.camera_permission_required, Toast.LENGTH_LONG).show();
             }
         }
     }
 
-    /**
-     * Set up and start the camera
-     */
+    // Setup and start camera
     private void startCamera() {
         ListenableFuture<ProcessCameraProvider> cameraProviderFuture =
                 ProcessCameraProvider.getInstance(this);
 
         cameraProviderFuture.addListener(() -> {
             try {
-                // Get the camera provider
                 ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
 
-                // Set up the preview
+                // Setup preview
                 Preview preview = new Preview.Builder().build();
                 preview.setSurfaceProvider(previewView.getSurfaceProvider());
 
-                // Set up image analysis for QR code
+                // Setup QR code analysis
                 ImageAnalysis imageAnalysis = new ImageAnalysis.Builder()
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build();
 
-                // Create QR scanner and set it as the analyzer
+                // Create QR scanner analyzer
                 QrCodeAnalyzer qrCodeAnalyzer = new QrCodeAnalyzer(
-                        qrContent -> runOnUiThread(() -> processQrContent(qrContent))
-                );
+                        qrContent -> runOnUiThread(() -> processQrContent(qrContent)));
                 imageAnalysis.setAnalyzer(cameraExecutor, qrCodeAnalyzer);
 
                 // Select back camera
@@ -176,186 +152,188 @@ public class QrScannerActivity extends AppCompatActivity {
                         .requireLensFacing(CameraSelector.LENS_FACING_BACK)
                         .build();
 
-                // Unbind any existing use cases
+                // Unbind existing use cases
                 cameraProvider.unbindAll();
 
                 // Bind use cases to camera
-                cameraProvider.bindToLifecycle(
-                        this,
-                        cameraSelector,
-                        preview,
-                        imageAnalysis
-                );
+                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalysis);
 
             } catch (ExecutionException | InterruptedException e) {
-                // Handle errors
                 Toast.makeText(this, "Error starting camera: " + e.getMessage(),
                         Toast.LENGTH_SHORT).show();
             }
         }, ContextCompat.getMainExecutor(this));
     }
 
-    /**
-     * Process the content from a scanned QR code
-     *
-     * @param qrContent The string content of the QR code
-     */
+    // Process scanned QR content
     private void processQrContent(String qrContent) {
+        // Prevent multiple simultaneous processing
+        if (isProcessing) return;
+
+        isProcessing = true;
+
         try {
-            // Parse QR content
-            JSONObject qrData = QrCodeParser.parse(qrContent);
+            showLoading(true);
+            statusTextView.setText("Processing voucher...");
 
-            // Check if this is a valid badge QR code
-            if (QrCodeParser.isBadgeQrCode(qrData)) {
-                // Handle the badge QR code
-                handleBadgeQrCode(qrData);
-            } else {
-                // Not a valid badge QR code
-                Toast.makeText(this, R.string.invalid_qr_code, Toast.LENGTH_SHORT).show();
+            // Decode base64 content
+            byte[] decodedBytes = Base64.decode(qrContent, Base64.DEFAULT);
+            Log.d(TAG, "Decoded QR Content (Hex): " + bytesToHex(decodedBytes));
+
+            // Deserialize certificate
+            String jsonContent = certHandler.deserialize(decodedBytes);
+            if (jsonContent == null || jsonContent.isEmpty()) {
+                showError("Certificate deserialization failed");
+                cleanupCertificate();
+                isProcessing = false;
+                return;
             }
 
-        } catch (JSONException e) {
-            // Error parsing QR code
-            Toast.makeText(this, R.string.error_parsing_qr, Toast.LENGTH_SHORT).show();
+            Log.d(TAG, "Deserialized JSON: " + jsonContent);
+
+            // Verify certificate
+            statusTextView.setText("Verifying voucher...");
+            boolean isValid = certHandler.verify();
+
+            if (!isValid) {
+                showError("Certificate verification failed");
+                cleanupCertificate();
+                isProcessing = false;
+                return;
+            }
+
+            Log.d(TAG, "Certificate verification successful");
+
+            try {
+                // Parse JSON data
+                JSONObject certJson = new JSONObject(jsonContent);
+
+                // Create QR data for badge service
+                JSONObject qrData = new JSONObject();
+                qrData.put("serial", certJson.optString("serial", "unknown"));
+                qrData.put("offer", certJson.optString("offer", "Unknown Offer"));
+                qrData.put("holder", certJson.optString("holder", "Anonymous"));
+                qrData.put("project", certJson.optString("project", "Unknown Project"));
+                qrData.put("cert", qrContent);
+
+                statusTextView.setText("Redeeming voucher...");
+                processBadgeQrCode(qrData);
+
+            } catch (JSONException e) {
+                Log.e(TAG, "Error parsing JSON: " + e.getMessage(), e);
+                showError("Error parsing certificate data");
+                cleanupCertificate();
+                isProcessing = false;
+            }
+        } catch (IllegalArgumentException e) {
+            Log.e(TAG, "Error decoding base64: " + e.getMessage(), e);
+            showError("Invalid QR code format");
+            isProcessing = false;
+        } catch (Exception e) {
+            Log.e(TAG, "Error processing QR code: " + e.getMessage(), e);
+            showError("Error processing QR code");
+            cleanupCertificate();
+            isProcessing = false;
         }
     }
 
-    /**
-     * Handle a badge QR code
-     *
-     * @param qrData The parsed JSON data from the QR code
-     */
-    private void handleBadgeQrCode(JSONObject qrData) {
-        // Check if user has a wallet
-        if (!walletManager.hasWallet()) {
-            // Show dialog to create wallet
-            showCreateWalletDialog(qrData);
-        } else {
-            // User has wallet, proceed to mint badge
-            mintBadge(qrData);
+    // Process badge creation/retrieval
+    private void processBadgeQrCode(JSONObject qrData) {
+        if (!QrCodeParser.isBadgeQrCode(qrData)) {
+            showError("Invalid voucher QR code");
+            cleanupCertificate();
+            isProcessing = false;
+            return;
         }
-    }
 
-    /**
-     * Show dialog to confirm wallet creation
-     *
-     * @param qrData The QR data to process after wallet creation
-     */
-    private void showCreateWalletDialog(JSONObject qrData) {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.create_wallet_title)
-                .setMessage(R.string.create_wallet_message)
-
-                .setPositiveButton(R.string.create_wallet_confirm, (dialog, which) -> {
-                            // Create wallet
-                            createWalletAndMintBadge(qrData);
-                        })
-                        .setNegativeButton(R.string.cancel, null)
-                        .show();
-    }
-
-    /**
-     * Create a wallet and then mint the nft( we'll display the badge)
-     * we can mint the nft,store it in wala and access it from wala
-     * @param qrData The QR data for the badge
-     */
-    private void createWalletAndMintBadge(JSONObject qrData) {
-        // Show loading state
-        showLoading(true);
-
-        // Create wallet
-        walletManager.createWallet(new WalletManager.WalletCallback() {
+        badgeService.mintBadge(qrData, new BadgeService.BadgeCallback() {
             @Override
-            public void onSuccess(String walletAddress) {
-                // Wallet created, update UI
-                updateStatusText();
+            public void onSuccess(Badge badge, boolean isNewBadge) {
+                showLoading(false);
+                cleanupCertificate();
 
-                // Now mint the badge
-                mintBadge(qrData);
+                // Show success message
+                String message = isNewBadge
+                        ? "Voucher redeemed successfully!"
+                        : "This voucher was already redeemed";
+                Toast.makeText(QrScannerActivity.this, message, Toast.LENGTH_LONG).show();
+
+                // Launch badge detail activity
+                Intent intent = new Intent(QrScannerActivity.this, BadgeDetailActivity.class);
+                intent.putExtra(BadgeDetailActivity.EXTRA_BADGE_SERIAL, badge.getSerial());
+                intent.putExtra(BadgeDetailActivity.EXTRA_IS_NEW_BADGE, isNewBadge);
+                intent.putExtra(BadgeDetailActivity.EXTRA_VERIFICATION_STATUS, "VERIFIED");
+                startActivity(intent);
+
+                isProcessing = false;
             }
 
             @Override
             public void onError(String errorMessage) {
-                // Handle error
-                showLoading(false);
-                Toast.makeText(QrScannerActivity.this,
-                        getString(R.string.wallet_creation_error, errorMessage),
-                        Toast.LENGTH_LONG).show();
+                showError(errorMessage);
+                cleanupCertificate();
+                isProcessing = false;
             }
         });
     }
 
-    /**
-     * Mint a new badge from QR data
-     *
-     * @param qrData The QR data for the badge
-     */
-    private void mintBadge(JSONObject qrData) {
-        // Show loading state
-        showLoading(true);
-
-        // Get wallet address
-        String walletAddress = walletManager.getWalletAddress();
-
-        // Call service to mint badge
-        badgeService.mintBadge(qrData, walletAddress, new BadgeService.BadgeCallback() {
-            @Override
-            public void onSuccess(Badge badge) {
-                // Hide loading
-                showLoading(false);
-
-                // Show badge acquired
-                showBadgeAcquired(badge);
-            }
-
-            @Override
-            public void onError(String errorMessage) {
-                // Hide loading
-                showLoading(false);
-
-                // Show error
-                Toast.makeText(QrScannerActivity.this,
-                        getString(R.string.badge_mint_error, errorMessage),
-                        Toast.LENGTH_LONG).show();
-            }
-        });
+    // Cleanup certificate resources
+    private void cleanupCertificate() {
+        try {
+            certHandler.destroy();
+            Log.d(TAG, "Certificate resources cleaned up");
+        } catch (Exception e) {
+            Log.e(TAG, "Error cleaning up certificate: " + e.getMessage(), e);
+        }
     }
 
-    /**
-     * Show loading indicator
-     *
-     * @param isLoading True to show loading, false to hide
-     */
+    // Show/hide loading indicator
     private void showLoading(boolean isLoading) {
-        View loadingView = findViewById(R.id.loading_view);
-        loadingView.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        runOnUiThread(() -> {
+            if (loadingView != null) {
+                loadingView.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+            }
+        });
     }
 
-    /**
-     * Show badge acquired success screen
-     *
-     * @param badge The acquired badge
-     */
-    private void showBadgeAcquired(Badge badge) {
-        // Launch badge detail activity
-        Intent intent = new Intent(this, BadgeDetailActivity.class);
-        intent.putExtra(BadgeDetailActivity.EXTRA_BADGE_ID, badge.getId());
-        intent.putExtra(BadgeDetailActivity.EXTRA_IS_NEW_BADGE, true);
-        startActivity(intent);
+    // Show error message
+    private void showError(String message) {
+        runOnUiThread(() -> {
+            showLoading(false);
+            Toast.makeText(QrScannerActivity.this, message, Toast.LENGTH_SHORT).show();
+            statusTextView.setText("Error: " + message);
+        });
     }
 
-
-    /**
-     * Open the badge gallery
-     */
+    // Navigate to badge gallery
     private void openBadgeGallery() {
         Intent intent = new Intent(this, BadgeGalleryActivity.class);
         startActivity(intent);
     }
 
+    // Convert bytes to hex string for logging
+    private String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02X ", b));
+        }
+        return sb.toString();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // Clean up certificate when activity is paused
+        cleanupCertificate();
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        cameraExecutor.shutdown();
+        // Clean up certificate and camera executor
+        cleanupCertificate();
+        if (cameraExecutor != null) {
+            cameraExecutor.shutdown();
+        }
     }
 }

@@ -1,7 +1,6 @@
 package org.defalsified.android.badged.services;
 
 import android.content.Context;
-import android.content.SharedPreferences;
 import android.util.Log;
 
 import org.defalsified.android.badged.models.Badge;
@@ -15,9 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Repository for managing badge data
- * Note: This is a simplified implementation using SharedPreferences
- * we will do a wala fetch from here
+ * Repository for managing badge data using SharedPreferences
  */
 public class BadgeRepository {
     private static final String TAG = "BadgeRepository";
@@ -31,9 +28,6 @@ public class BadgeRepository {
 
     /**
      * Save a badge to storage
-     *
-     * @param badge Badge to save
-     * @return true if save was successful
      */
     public boolean saveBadge(Badge badge) {
         try {
@@ -42,7 +36,7 @@ public class BadgeRepository {
 
             // Check if badge already exists
             for (int i = 0; i < badges.size(); i++) {
-                if (badges.get(i).getId().equals(badge.getId())) {
+                if (badges.get(i).getSerial().equals(badge.getSerial())) {
                     // Update existing badge
                     badges.set(i, badge);
                     return saveBadgeList(badges);
@@ -60,16 +54,13 @@ public class BadgeRepository {
     }
 
     /**
-     * Get a badge by its ID
-     *
-     * @param badgeId ID of the badge to retrieve
-     * @return Badge object or null if not found
+     * Get a badge by its serial
      */
-    public Badge getBadgeById(String badgeId) {
+    public Badge getBadgeById(String badgeSerial) {
         List<Badge> badges = getAllBadges();
 
         for (Badge badge : badges) {
-            if (badge.getId().equals(badgeId)) {
+            if (badge.getSerial().equals(badgeSerial)) {
                 return badge;
             }
         }
@@ -92,10 +83,11 @@ public class BadgeRepository {
                 JSONObject badgeJson = badgesArray.getJSONObject(i);
 
                 Badge badge = new Badge();
-                badge.setId(badgeJson.getString("id"));
-                badge.setName(badgeJson.getString("name"));
-                badge.setDescription(badgeJson.getString("description"));
-                badge.setImageUrl(badgeJson.getString("imageUrl"));
+                badge.setSerial(badgeJson.getString("serial"));
+                badge.setOffer(badgeJson.getString("offer"));
+                badge.setHolder(badgeJson.getString("holder"));
+                badge.setProject(badgeJson.getString("project"));
+                badge.setCertificateData(badgeJson.getString("certificateData"));
                 badge.setTimestamp(badgeJson.getLong("timestamp"));
 
                 badges.add(badge);
@@ -110,9 +102,6 @@ public class BadgeRepository {
 
     /**
      * Save a list of badges to storage
-     *
-     * @param badges List of badges to save
-     * @return true if save was successful
      */
     private boolean saveBadgeList(List<Badge> badges) {
         try {
@@ -120,10 +109,11 @@ public class BadgeRepository {
 
             for (Badge badge : badges) {
                 JSONObject badgeJson = new JSONObject();
-                badgeJson.put("id", badge.getId());
-                badgeJson.put("name", badge.getName());
-                badgeJson.put("description", badge.getDescription());
-                badgeJson.put("imageUrl", badge.getImageUrl());
+                badgeJson.put("serial", badge.getSerial());
+                badgeJson.put("offer", badge.getOffer());
+                badgeJson.put("holder", badge.getHolder());
+                badgeJson.put("project", badge.getProject());
+                badgeJson.put("certificateData", badge.getCertificateData());
                 badgeJson.put("timestamp", badge.getTimestamp());
 
                 badgesArray.put(badgeJson);

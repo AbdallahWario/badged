@@ -17,7 +17,25 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent"
         app:title="@string/badge_gallery_title"
-        app:titleTextColor="@android:color/white" />
+        app:titleTextColor="@android:color/white">
+
+        <!-- Scan Voucher Text Button on the right side -->
+        <TextView
+            android:text="@string/scan_voucher"
+            android:id="@+id/scan_voucher_text"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_gravity="end"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:paddingStart="16dp"
+            android:paddingEnd="16dp"
+            android:textColor="@android:color/white"
+            android:textSize="14sp" />
+
+    </androidx.appcompat.widget.Toolbar>
 
     <!-- Empty state -->
     <LinearLayout

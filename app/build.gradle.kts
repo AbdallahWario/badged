@@ -16,7 +16,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
-            abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64")) // Native archs
+            abiFilters.addAll(listOf( "arm64-v8a")) // Native archs
         }
 
         externalNativeBuild {

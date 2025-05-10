@@ -1,8 +1,8 @@
 package org.defalsified.android.badged.ui.badges;
 
-import android.content.Intent;
 import android.os.Bundle;
-import android.view.MenuItem;
+import android.util.Log;
+import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -11,147 +11,152 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 
+import com.google.android.material.appbar.CollapsingToolbarLayout;
+
 import org.defalsified.android.badged.R;
 import org.defalsified.android.badged.models.Badge;
 import org.defalsified.android.badged.services.BadgeRepository;
-import com.google.android.material.appbar.CollapsingToolbarLayout;
 
 /**
- * Activity to display badge details
+ * Activity for displaying badge details
+ *  Certificate verification is now handled during QR scanning
  */
 public class BadgeDetailActivity extends AppCompatActivity {
+    private static final String TAG = "BadgeDetailActivity";
 
-    public static final String EXTRA_BADGE_ID = "badge_id";
+    // Use serial
+    public static final String EXTRA_BADGE_SERIAL = "badge_serial";
     public static final String EXTRA_IS_NEW_BADGE = "is_new_badge";
+    public static final String EXTRA_VERIFICATION_STATUS = "verification_status";
 
     private BadgeRepository badgeRepository;
-    private Badge badge;
-
-    // UI Elements
-    private CollapsingToolbarLayout collapsingToolbar;
-    private ImageView badgeImage;
-    private TextView badgeId;
-    private TextView badgeDescription;
-    private TextView acquisitionDate;
-    private Button shareButton;
+    private TextView verificationStatusText;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_badge_detail);
 
-        // Initialize repository
-        badgeRepository = new BadgeRepository(this);
-
         // Set up toolbar
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
-
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-            getSupportActionBar().setTitle("");
         }
+
+        // Set up collapsing toolbar
+        CollapsingToolbarLayout collapsingToolbar = findViewById(R.id.collapsing_toolbar);
+
+        // Initialize services
+        badgeRepository = new BadgeRepository(this);
 
         // Initialize views
+        verificationStatusText = findViewById(R.id.verification_status);
 
-        initViews();
-
-        // Get badge ID from intent
-
-        String badgeId = getIntent().getStringExtra(EXTRA_BADGE_ID);
+        // Get badge data from intent
+        String badgeSerial = getIntent().getStringExtra(EXTRA_BADGE_SERIAL);
         boolean isNewBadge = getIntent().getBooleanExtra(EXTRA_IS_NEW_BADGE, false);
+        String verificationStatus = getIntent().getStringExtra(EXTRA_VERIFICATION_STATUS);
 
-        if (badgeId != null) {
-            // Load badge details
-            loadBadgeDetails(badgeId);
-
-            // Show toast if it's a new badge
-            if (isNewBadge) {
-                Toast.makeText(this, "New badge acquired!", Toast.LENGTH_LONG).show();
-            }
-        } else {
-            // No badge ID provided, finish activity
-            Toast.makeText(this, "Error: No badge information", Toast.LENGTH_SHORT).show();
+        if (badgeSerial == null) {
             finish();
+            return;
         }
-    }
 
-    /**
-     * Initialize UI elements
-     */
-    private void initViews() {
-        collapsingToolbar = findViewById(R.id.collapsing_toolbar);
-        badgeImage = findViewById(R.id.badge_image);
-        badgeId = findViewById(R.id.badge_id);
-        badgeDescription = findViewById(R.id.badge_description);
-        acquisitionDate = findViewById(R.id.acquisition_date);
-        shareButton = findViewById(R.id.share_button);
-
-        // Set up share button
-        shareButton.setOnClickListener(v -> shareBadge());
-    }
-
-    /**
-     * Load badge details from repository
-     *
-     * @param badgeId ID of the badge to load
-     */
-    private void loadBadgeDetails(String badgeId) {
-        badge = badgeRepository.getBadgeById(badgeId);
-
-        if (badge != null) {
-            // Update UI with badge details
-            updateUI();
-        } else {
-            // Badge not found
-            Toast.makeText(this, "Error: Badge not found", Toast.LENGTH_SHORT).show();
+        // Fetch badge
+        Badge badge = badgeRepository.getBadgeById(badgeSerial);
+        if (badge == null) {
             finish();
+            return;
         }
-    }
 
-    /**
-     * Update UI with badge details
-     */
-    private void updateUI() {
-        // Set badge title
-        collapsingToolbar.setTitle(badge.getName());
+        // Populate views
+        ImageView badgeImage = findViewById(R.id.badge_image);
+        TextView badgeIdText = findViewById(R.id.badge_id);
+        TextView descriptionText = findViewById(R.id.badge_description);
+        TextView acquisitionDateText = findViewById(R.id.acquisition_date);
+        Button shareButton = findViewById(R.id.share_button);
+        Button verifyButton = findViewById(R.id.verify_button);
 
-        // Set badge image
+        //  badge name in collapsing toolbar
+        collapsingToolbar.setTitle(badge.getDisplayName());
+
+        // badge details
+        badgeIdText.setText(badge.getSerial());
+        descriptionText.setText(badge.getDisplayDescription());
+        acquisitionDateText.setText(badge.getFormattedDate());
+
+        //  placeholder image
         badgeImage.setImageResource(R.drawable.badge_placeholder);
 
-        // Set badge details
-        badgeId.setText(badge.getId());
-        badgeDescription.setText(badge.getDescription());
-        acquisitionDate.setText(badge.getFormattedDate());
-    }
+        // Share button
+        shareButton.setOnClickListener(v -> shareBadge(badge));
 
-    /**
-     * Share badge information
-     */
-    private void shareBadge() {
-        if (badge == null) return;
-
-        // Create share intent
-        Intent shareIntent = new Intent(Intent.ACTION_SEND);
-        shareIntent.setType("text/plain");
-        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "Check out my " + badge.getName());
-        shareIntent.putExtra(Intent.EXTRA_TEXT,
-                "I just earned the " + badge.getName() + " badge in BadgeStay!\n\n" +
-                        badge.getDescription());
-
-        // Start share chooser
-        startActivity(Intent.createChooser(shareIntent, "Share Badge"));
-    }
-
-    /**
-     * Handle back button in toolbar
-     */
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
-            onBackPressed();
-            return true;
+        // Since verification is done during scanning, show the result
+        if (verificationStatus != null && !verificationStatus.isEmpty()) {
+            showVerificationStatus(verificationStatus);
+        } else {
+            // No verification info available
+            verificationStatusText.setVisibility(View.GONE);
         }
-        return super.onOptionsItemSelected(item);
+
+        // Hide verify button since verification is done during scanning
+        verifyButton.setVisibility(View.GONE);
+
+        // Show indication for new badges
+        if (isNewBadge) {
+            Toast.makeText(this, "Newly redeemed badge!", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * Show verification status in the UI
+     */
+    private void showVerificationStatus(String status) {
+        verificationStatusText.setVisibility(View.VISIBLE);
+
+        switch (status.toUpperCase()) {
+            case "VERIFIED":
+            case "VALID":
+                verificationStatusText.setText("✓ Verified");
+                verificationStatusText.setTextColor(getResources().getColor(R.color.colorPrimary));
+                break;
+            case "INVALID":
+            case "FAILED":
+                verificationStatusText.setText("✗ Invalid");
+                verificationStatusText.setTextColor(getResources().getColor(R.color.colorAccent));
+                break;
+            default:
+                verificationStatusText.setText(status);
+                verificationStatusText.setTextColor(getResources().getColor(R.color.colorPrimary));
+                break;
+        }
+    }
+
+    /**
+     * Share badge details
+     */
+    private void shareBadge(Badge badge) {
+        // Create sharing intent
+        android.content.Intent shareIntent = new android.content.Intent();
+        shareIntent.setAction(android.content.Intent.ACTION_SEND);
+        shareIntent.setType("text/plain");
+
+        // share text
+        String shareText = String.format("voucher redeemed: %s\nSerial: %s\nDate: %s",
+                badge.getDisplayName(),
+                badge.getSerial(),
+                badge.getFormattedDate());
+
+        shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, shareText);
+
+        // Start sharing activity
+        startActivity(android.content.Intent.createChooser(shareIntent, "Share Badge"));
+    }
+
+    @Override
+    public boolean onSupportNavigateUp() {
+        onBackPressed();
+        return true;
     }
 }

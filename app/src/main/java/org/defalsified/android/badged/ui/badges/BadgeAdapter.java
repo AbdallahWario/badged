@@ -1,6 +1,5 @@
 package org.defalsified.android.badged.ui.badges;
 
-import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -83,9 +82,8 @@ public class BadgeAdapter extends RecyclerView.Adapter<BadgeAdapter.BadgeViewHol
          */
         public void bind(Badge badge, OnBadgeClickListener listener) {
             // Set badge name and date
-            badgeName.setText(badge.getName());
-            badgeDate.setText(itemView.getContext().getString(
-                    R.string.acquired_date, badge.getFormattedDate()));
+            badgeName.setText(badge.getDisplayName());
+            badgeDate.setText(badge.getFormattedDate());
 
             // Set badge image (using a placeholder for now)
             badgeImage.setImageResource(R.drawable.badge_placeholder);

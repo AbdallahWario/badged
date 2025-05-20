@@ -4,6 +4,8 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Base64;
 import android.util.Log;
 import android.view.View;
@@ -41,6 +43,7 @@ import java.util.concurrent.Executors;
 public class QrScannerActivity extends AppCompatActivity {
     private static final String TAG = "QrScannerActivity";
     private static final int REQUEST_CAMERA_PERMISSION = 10;
+    private static final long SCANNING_COOLDOWN_MS = 2000; // 2s cooldown between scans
 
     // UI Components
     private PreviewView previewView;
@@ -50,6 +53,8 @@ public class QrScannerActivity extends AppCompatActivity {
 
     // Camera and analysis
     private ExecutorService cameraExecutor;
+    private QrCodeAnalyzer qrCodeAnalyzer;
+    private ProcessCameraProvider cameraProvider;
 
     // Services
     private BadgeService badgeService;
@@ -57,15 +62,18 @@ public class QrScannerActivity extends AppCompatActivity {
 
     // Processing state
     private boolean isProcessing = false;
+    private long lastProcessingTime = 0;
+    private Handler mainHandler;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_qr_scanner);
 
-        // Initialize services
+        // Init services
         badgeService = new BadgeService(this);
         certHandler = new Cert();
+        mainHandler = new Handler(Looper.getMainLooper());
 
         // Setup UI
         initializeViews();
@@ -81,7 +89,7 @@ public class QrScannerActivity extends AppCompatActivity {
         }
     }
 
-    // Initialize UI components
+    // Init UI components
     private void initializeViews() {
         previewView = findViewById(R.id.preview_view);
         statusTextView = findViewById(R.id.status_text);
@@ -89,12 +97,17 @@ public class QrScannerActivity extends AppCompatActivity {
         loadingView = findViewById(R.id.loading_view);
 
         galleryButton.setOnClickListener(v -> openBadgeGallery());
-        updateStatusText();
+        updateStatusText(R.string.scanner_ready);
     }
 
-    // Update status message
-    private void updateStatusText() {
-        statusTextView.setText(R.string.scanner_ready);
+    // Update status with resource ID
+    private void updateStatusText(int stringResId) {
+        statusTextView.setText(stringResId);
+    }
+
+    // Update status with custom text
+    private void updateStatusText(String message) {
+        statusTextView.setText(message);
     }
 
     // Check camera permission
@@ -131,7 +144,7 @@ public class QrScannerActivity extends AppCompatActivity {
 
         cameraProviderFuture.addListener(() -> {
             try {
-                ProcessCameraProvider cameraProvider = cameraProviderFuture.get();
+                cameraProvider = cameraProviderFuture.get();
 
                 // Setup preview
                 Preview preview = new Preview.Builder().build();
@@ -142,9 +155,14 @@ public class QrScannerActivity extends AppCompatActivity {
                         .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                         .build();
 
-                // Create QR scanner analyzer
-                QrCodeAnalyzer qrCodeAnalyzer = new QrCodeAnalyzer(
-                        qrContent -> runOnUiThread(() -> processQrContent(qrContent)));
+                //  QR analyzer with cooldown
+                qrCodeAnalyzer = new QrCodeAnalyzer(qrContent -> {
+                    // Only process if not busy and after cooldown
+                    if (!isProcessing && System.currentTimeMillis() > lastProcessingTime + SCANNING_COOLDOWN_MS) {
+                        mainHandler.post(() -> processQrContent(qrContent));
+                    }
+                });
+
                 imageAnalysis.setAnalyzer(cameraExecutor, qrCodeAnalyzer);
 
                 // Select back camera
@@ -165,153 +183,175 @@ public class QrScannerActivity extends AppCompatActivity {
         }, ContextCompat.getMainExecutor(this));
     }
 
+    // Pause camera during processing
+    private void pauseCameraScanning() {
+        if (cameraProvider != null) {
+            cameraProvider.unbindAll();
+        }
+    }
+
+    // Resume camera after processing
+    private void resumeCameraScanning() {
+        startCamera();
+    }
+
     // Process scanned QR content
     private void processQrContent(String qrContent) {
-        // Prevent multiple simultaneous processing
-        if (isProcessing) return;
-
+        // Set processing state
         isProcessing = true;
+        lastProcessingTime = System.currentTimeMillis();
 
-        try {
-            showLoading(true);
-            statusTextView.setText("Processing voucher...");
+        // Pause camera during processing
+        pauseCameraScanning();
 
-            // Decode base64 content
-            byte[] decodedBytes = Base64.decode(qrContent, Base64.DEFAULT);
-            Log.d(TAG, "Decoded QR Content (Hex): " + bytesToHex(decodedBytes));
+        // Show loading UI
+        showLoading(true);
+        updateStatusText("Processing voucher...");
 
-            // Deserialize certificate
-            String jsonContent = certHandler.deserialize(decodedBytes);
-            if (jsonContent == null || jsonContent.isEmpty()) {
-                showError("Certificate deserialization failed");
-                cleanupCertificate();
-                isProcessing = false;
-                return;
-            }
-
-            Log.d(TAG, "Deserialized JSON: " + jsonContent);
-
-            // Verify certificate
-            statusTextView.setText("Verifying voucher...");
-            boolean isValid = certHandler.verify();
-
-            if (!isValid) {
-                showError("Certificate verification failed");
-                cleanupCertificate();
-                isProcessing = false;
-                return;
-            }
-
-            Log.d(TAG, "Certificate verification successful");
+        // Process in background
+        ExecutorService processingExecutor = Executors.newSingleThreadExecutor();
+        processingExecutor.execute(() -> {
+            Cert.CertificateResult result = null;
 
             try {
-                // Parse JSON data
-                JSONObject certJson = new JSONObject(jsonContent);
+                // Decode base64
+                byte[] decodedBytes = Base64.decode(qrContent, Base64.DEFAULT);
+                Log.d(TAG, "Decoded QR Content (Hex): " + bytesToHex(decodedBytes));
 
-                // Create QR data for badge service
-                JSONObject qrData = new JSONObject();
-                qrData.put("serial", certJson.optString("serial", "unknown"));
-                qrData.put("offer", certJson.optString("offer", "Unknown Offer"));
-                qrData.put("holder", certJson.optString("holder", "Anonymous"));
-                qrData.put("project", certJson.optString("project", "Unknown Project"));
-                qrData.put("cert", qrContent);
+                // Process certificate
+                result = certHandler.processAndCleanup(decodedBytes);
 
-                statusTextView.setText("Redeeming voucher...");
-                processBadgeQrCode(qrData);
+                if (!result.success) {
+                    String errorMessage = result.error != null ? result.error : "Certificate processing failed";
+                    mainHandler.post(() -> {
+                        showError(errorMessage);
+                        finishProcessing();
+                    });
+                    return;
+                }
 
-            } catch (JSONException e) {
-                Log.e(TAG, "Error parsing JSON: " + e.getMessage(), e);
-                showError("Error parsing certificate data");
-                cleanupCertificate();
-                isProcessing = false;
+                try {
+                    // Parse JSON
+                    String jsonContent = result.jsonContent;
+                    JSONObject certJson = new JSONObject(jsonContent);
+
+                    // Create QR data
+                    JSONObject qrData = new JSONObject();
+                    qrData.put("serial", certJson.optString("serial", "unknown"));
+                    qrData.put("offer", certJson.optString("offer", "Unknown Offer"));
+                    qrData.put("holder", certJson.optString("holder", "Anonymous"));
+                    qrData.put("project", certJson.optString("project", "Unknown Project"));
+                    qrData.put("cert", qrContent);
+
+                    // Update status
+                    mainHandler.post(() -> updateStatusText("Redeeming voucher..."));
+
+                    // Process badge
+                    processBadgeQrCode(qrData);
+
+                } catch (JSONException e) {
+                    Log.e(TAG, "Error parsing JSON: " + e.getMessage(), e);
+                    mainHandler.post(() -> {
+                        showError("Error parsing certificate data");
+                        finishProcessing();
+                    });
+                }
+            } catch (IllegalArgumentException e) {
+                Log.e(TAG, "Error decoding base64: " + e.getMessage(), e);
+                mainHandler.post(() -> {
+                    showError("Invalid QR code format");
+                    finishProcessing();
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "Error processing QR code: " + e.getMessage(), e);
+                mainHandler.post(() -> {
+                    showError("Error processing QR code");
+                    finishProcessing();
+                });
             }
-        } catch (IllegalArgumentException e) {
-            Log.e(TAG, "Error decoding base64: " + e.getMessage(), e);
-            showError("Invalid QR code format");
-            isProcessing = false;
-        } catch (Exception e) {
-            Log.e(TAG, "Error processing QR code: " + e.getMessage(), e);
-            showError("Error processing QR code");
-            cleanupCertificate();
-            isProcessing = false;
-        }
+        });
+
+        processingExecutor.shutdown();
     }
 
     // Process badge creation/retrieval
     private void processBadgeQrCode(JSONObject qrData) {
         if (!QrCodeParser.isBadgeQrCode(qrData)) {
-            showError("Invalid voucher QR code");
-            cleanupCertificate();
-            isProcessing = false;
+            mainHandler.post(() -> {
+                showError("Invalid voucher QR code");
+                finishProcessing();
+            });
             return;
         }
 
         badgeService.mintBadge(qrData, new BadgeService.BadgeCallback() {
             @Override
             public void onSuccess(Badge badge, boolean isNewBadge) {
-                showLoading(false);
-                cleanupCertificate();
+                mainHandler.post(() -> {
+                    // Hide loading
+                    showLoading(false);
 
-                // Show success message
-                String message = isNewBadge
-                        ? "Voucher redeemed successfully!"
-                        : "This voucher was already redeemed";
-                Toast.makeText(QrScannerActivity.this, message, Toast.LENGTH_LONG).show();
+                    // Create message based on badge status
+                    String message = isNewBadge
+                            ? "Voucher redeemed successfully!"
+                            : "This voucher was already redeemed";
 
-                // Launch badge detail activity
-                Intent intent = new Intent(QrScannerActivity.this, BadgeDetailActivity.class);
-                intent.putExtra(BadgeDetailActivity.EXTRA_BADGE_SERIAL, badge.getSerial());
-                intent.putExtra(BadgeDetailActivity.EXTRA_IS_NEW_BADGE, isNewBadge);
-                intent.putExtra(BadgeDetailActivity.EXTRA_VERIFICATION_STATUS, "VERIFIED");
-                startActivity(intent);
+                    // Show toast
+                    Toast.makeText(QrScannerActivity.this, message, Toast.LENGTH_LONG).show();
 
-                isProcessing = false;
+                    // Launch badge detail
+                    Intent intent = new Intent(QrScannerActivity.this, BadgeDetailActivity.class);
+                    intent.putExtra(BadgeDetailActivity.EXTRA_BADGE_SERIAL, badge.getSerial());
+                    intent.putExtra(BadgeDetailActivity.EXTRA_IS_NEW_BADGE, isNewBadge);
+                    intent.putExtra(BadgeDetailActivity.EXTRA_VERIFICATION_STATUS, "VERIFIED");
+                    startActivity(intent);
+
+                    // Reset state
+                    finishProcessing();
+                });
             }
 
             @Override
             public void onError(String errorMessage) {
-                showError(errorMessage);
-                cleanupCertificate();
-                isProcessing = false;
+                mainHandler.post(() -> {
+                    showError(errorMessage);
+                    finishProcessing();
+                });
             }
         });
     }
 
-    // Cleanup certificate resources
-    private void cleanupCertificate() {
-        try {
-            certHandler.destroy();
-            Log.d(TAG, "Certificate resources cleaned up");
-        } catch (Exception e) {
-            Log.e(TAG, "Error cleaning up certificate: " + e.getMessage(), e);
-        }
+    // Reset processing state
+    private void finishProcessing() {
+        showLoading(false);
+        isProcessing = false;
+        updateStatusText(R.string.scanner_ready);
+
+        // Resume camera after delay
+        mainHandler.postDelayed(this::resumeCameraScanning, 500);
     }
 
-    // Show/hide loading indicator
+    // Show/hide loading
     private void showLoading(boolean isLoading) {
-        runOnUiThread(() -> {
-            if (loadingView != null) {
-                loadingView.setVisibility(isLoading ? View.VISIBLE : View.GONE);
-            }
-        });
+        if (loadingView != null) {
+            loadingView.setVisibility(isLoading ? View.VISIBLE : View.GONE);
+        }
     }
 
     // Show error message
     private void showError(String message) {
-        runOnUiThread(() -> {
-            showLoading(false);
-            Toast.makeText(QrScannerActivity.this, message, Toast.LENGTH_SHORT).show();
-            statusTextView.setText("Error: " + message);
-        });
+        showLoading(false);
+        Toast.makeText(QrScannerActivity.this, message, Toast.LENGTH_SHORT).show();
+        updateStatusText("Error: " + message);
     }
 
-    // Navigate to badge gallery
+    // Go to badge gallery
     private void openBadgeGallery() {
         Intent intent = new Intent(this, BadgeGalleryActivity.class);
         startActivity(intent);
     }
 
-    // Convert bytes to hex string for logging
+    // Convert bytes to hex for logging
     private String bytesToHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {
@@ -323,15 +363,27 @@ public class QrScannerActivity extends AppCompatActivity {
     @Override
     protected void onPause() {
         super.onPause();
-        // Clean up certificate when activity is paused
-        cleanupCertificate();
+        // Clean up when paused
+        if (cameraProvider != null) {
+            cameraProvider.unbindAll();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Reset state on resume
+        isProcessing = false;
+        if (hasCameraPermission()) {
+            resumeCameraScanning();
+        }
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        // Clean up certificate and camera executor
-        cleanupCertificate();
+        // Clean up resources
+        certHandler.cleanupJNI();
         if (cameraExecutor != null) {
             cameraExecutor.shutdown();
         }

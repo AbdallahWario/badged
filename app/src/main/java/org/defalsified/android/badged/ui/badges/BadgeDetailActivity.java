@@ -18,40 +18,40 @@ import org.defalsified.android.badged.models.Badge;
 import org.defalsified.android.badged.services.BadgeRepository;
 
 /**
- * Activity for displaying badge details
- *  Certificate verification is now handled during QR scanning
+ * Shows badge details (verification done during QR scanning)
  */
 public class BadgeDetailActivity extends AppCompatActivity {
     private static final String TAG = "BadgeDetailActivity";
 
-    // Use serial
     public static final String EXTRA_BADGE_SERIAL = "badge_serial";
     public static final String EXTRA_IS_NEW_BADGE = "is_new_badge";
     public static final String EXTRA_VERIFICATION_STATUS = "verification_status";
 
     private BadgeRepository badgeRepository;
     private TextView verificationStatusText;
+    private View newBadgeIndicator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_badge_detail);
 
-        // Set up toolbar
+        // Setup toolbar
         Toolbar toolbar = findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
-        // Set up collapsing toolbar
+        // Setup collapsing toolbar
         CollapsingToolbarLayout collapsingToolbar = findViewById(R.id.collapsing_toolbar);
 
-        // Initialize services
+        // Init services
         badgeRepository = new BadgeRepository(this);
 
-        // Initialize views
+        // Init views
         verificationStatusText = findViewById(R.id.verification_status);
+        newBadgeIndicator = findViewById(R.id.new_badge_indicator);
 
         // Get badge data from intent
         String badgeSerial = getIntent().getStringExtra(EXTRA_BADGE_SERIAL);
@@ -63,7 +63,7 @@ public class BadgeDetailActivity extends AppCompatActivity {
             return;
         }
 
-        // Fetch badge
+        // Get badge
         Badge badge = badgeRepository.getBadgeById(badgeSerial);
         if (badge == null) {
             finish();
@@ -78,39 +78,40 @@ public class BadgeDetailActivity extends AppCompatActivity {
         Button shareButton = findViewById(R.id.share_button);
         Button verifyButton = findViewById(R.id.verify_button);
 
-        //  badge name in collapsing toolbar
+        // Badge name in toolbar
         collapsingToolbar.setTitle(badge.getDisplayName());
 
-        // badge details
+        // Badge details
         badgeIdText.setText(badge.getSerial());
         descriptionText.setText(badge.getDisplayDescription());
         acquisitionDateText.setText(badge.getFormattedDate());
 
-        //  placeholder image
+        // Placeholder image
         badgeImage.setImageResource(R.drawable.badge_placeholder);
 
         // Share button
         shareButton.setOnClickListener(v -> shareBadge(badge));
 
-        // Since verification is done during scanning, show the result
+        // Show verification status if available
         if (verificationStatus != null && !verificationStatus.isEmpty()) {
             showVerificationStatus(verificationStatus);
         } else {
-            // No verification info available
             verificationStatusText.setVisibility(View.GONE);
         }
 
-        // Hide verify button since verification is done during scanning
+        // Hide verify button (verification done during scanning)
         verifyButton.setVisibility(View.GONE);
 
-        // Show indication for new badges
+        // Show new badge indicator
         if (isNewBadge) {
-            Toast.makeText(this, "Newly redeemed badge!", Toast.LENGTH_SHORT).show();
+            newBadgeIndicator.setVisibility(View.VISIBLE);
+        } else {
+            newBadgeIndicator.setVisibility(View.GONE);
         }
     }
 
     /**
-     * Show verification status in the UI
+     * Display verification status
      */
     private void showVerificationStatus(String status) {
         verificationStatusText.setVisibility(View.VISIBLE);
@@ -134,7 +135,7 @@ public class BadgeDetailActivity extends AppCompatActivity {
     }
 
     /**
-     * Share badge details
+     * Share badge info
      */
     private void shareBadge(Badge badge) {
         // Create sharing intent
@@ -142,7 +143,7 @@ public class BadgeDetailActivity extends AppCompatActivity {
         shareIntent.setAction(android.content.Intent.ACTION_SEND);
         shareIntent.setType("text/plain");
 
-        // share text
+        // Share text
         String shareText = String.format("voucher redeemed: %s\nSerial: %s\nDate: %s",
                 badge.getDisplayName(),
                 badge.getSerial(),
@@ -150,7 +151,7 @@ public class BadgeDetailActivity extends AppCompatActivity {
 
         shareIntent.putExtra(android.content.Intent.EXTRA_TEXT, shareText);
 
-        // Start sharing activity
+        // Start sharing
         startActivity(android.content.Intent.createChooser(shareIntent, "Share Badge"));
     }
 

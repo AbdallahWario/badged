@@ -63,15 +63,18 @@ public class BadgeAdapter extends RecyclerView.Adapter<BadgeAdapter.BadgeViewHol
      * ViewHolder for badge items
      */
     static class BadgeViewHolder extends RecyclerView.ViewHolder {
+
         private final ImageView badgeImage;
         private final TextView badgeName;
         private final TextView badgeDate;
+        private final TextView badgeSerial;
 
         public BadgeViewHolder(@NonNull View itemView) {
             super(itemView);
             badgeImage = itemView.findViewById(R.id.badge_image);
             badgeName = itemView.findViewById(R.id.badge_name);
             badgeDate = itemView.findViewById(R.id.badge_date);
+            badgeSerial = itemView.findViewById(R.id.badge_serial);
         }
 
         /**
@@ -81,11 +84,14 @@ public class BadgeAdapter extends RecyclerView.Adapter<BadgeAdapter.BadgeViewHol
          * @param listener Click listener
          */
         public void bind(Badge badge, OnBadgeClickListener listener) {
-            // Set badge name and date
+            // badge name and date
             badgeName.setText(badge.getDisplayName());
             badgeDate.setText(badge.getFormattedDate());
 
-            // Set badge image (using a placeholder for now)
+            if (badgeSerial != null) {
+                badgeSerial.setText("Serial: " + badge.getSerial());
+            }
+
             badgeImage.setImageResource(R.drawable.badge_placeholder);
 
             // Set click listener

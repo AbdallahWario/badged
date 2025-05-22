@@ -50,7 +50,7 @@ public class Badge implements Serializable {
 
     // Display methods
     public String getDisplayName() {
-        return offer + " Badge";
+        return offer + "voucher";
     }
 
     public String getDisplayDescription() {

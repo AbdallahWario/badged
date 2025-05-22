@@ -84,7 +84,7 @@ public class BadgeGalleryActivity extends AppCompatActivity implements BadgeAdap
         }
     }
 
-    /**
+    /**]
      * Handle badge click
      */
     @Override

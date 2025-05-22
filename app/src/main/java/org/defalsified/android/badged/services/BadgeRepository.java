@@ -11,6 +11,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -45,6 +47,22 @@ public class BadgeRepository {
 
             // Add new badge
             badges.add(badge);
+
+            // Sorting vouchers latest first( descending order by serial number)
+            badges.sort(new Comparator<Badge>() {
+                @Override
+                public int compare(Badge b1, Badge b2) {
+                    try {
+                        int serial1 = Integer.parseInt(b1.getSerial());
+                        int serial2 = Integer.parseInt(b2.getSerial());
+                        return Integer.compare(serial2, serial1);
+                    } catch (NumberFormatException e) {
+                        Log.w(TAG, "Failed to parse serial numbers as integers, using string comparison");
+                        return b2.getSerial().compareTo(b1.getSerial());
+                    }
+                }
+            });
+
             return saveBadgeList(badges);
 
         } catch (Exception e) {
